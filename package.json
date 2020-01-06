@@ -1,0 +1,17 @@
+{
+  "name": "limitless",
+  "version": "1.0.0",
+  "description": "A flexible event handler",
+  "main": "index.js",
+  "author": "Mitch McGinnis",
+  "license": "MIT",
+  "scripts": {
+    "test": "mocha",
+    "build": "yarn test"
+  },
+  "devDependencies": {
+    "mocha": "^7.0.0",
+    "chai": "^4.2.0"
+  },
+  "dependencies": {}
+}
