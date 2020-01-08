@@ -11,11 +11,13 @@ const defaultFileHandler = (contents) => {
 }
 
 const Limitless = (
-        jobDefinitions = [],
-        eventActions = [],
-        argumentHandlers = {},
-        runHandlers = {},
-        triggerHandlers = {}
+        {
+           jobDefinitions = [],
+           eventActions = [],
+           argumentHandlers = {},
+           runHandlers = {},
+           triggerHandlers = {}
+        } = {}
     ) => {
         const addAction = (name) => (action) => {
             let newAction = {}
