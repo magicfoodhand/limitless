@@ -119,11 +119,12 @@ describe('Limitless', () => {
 
     describe('#defaultFileHandler()', () => {
         it('should try to parse json - default', () => {
-            const defaultValue = {
+            const defaultValue = [{
                 config: {},
                 jobs: [],
-            }
-            const value = defaultFileHandler("{}")
+                pipeline: [],
+            }]
+            const value = defaultFileHandler("[{}]")
             defaultValue.should.deep.equal(value)
         })
     })
