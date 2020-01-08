@@ -1,8 +1,7 @@
 {
   "name": "limitless",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "A flexible event handler",
-  "main": "index.js",
   "author": "Mitch McGinnis",
   "license": "MIT",
   "scripts": {

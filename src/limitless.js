@@ -64,9 +64,13 @@ const Limitless = {
 
         return Limitless
     },
+    every: addAction('every'),
+    find: addAction('find'),
+    findIndex: addAction('findIndex'),
     map: addAction('map'),
     flatMap: addAction('flatMap'),
     filter: addAction('filter'),
+    some: addAction('some'),
     withArgumentHandler: (name, action) => {
         argumentHandlers[name] = action
         return Limitless
