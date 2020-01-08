@@ -3,21 +3,30 @@ const fs = "fs"
 const addDefault = (base, property, value) =>
     !base[property] && (base[property] = value)
 
-const defaultFileHandler = (contents) =>
-    JSON.parse(contents).map(value => {
-        addDefault(value, 'config', {})
-        addDefault(value, 'jobs', [])
-        addDefault(value, 'pipeline', [])
-        return value
-    })
+const defaultFileHandler = (contents) => {
+    const value = JSON.parse(contents)
+    addDefault(value, 'config', {})
+    addDefault(value, 'jobs', [])
+    addDefault(value, 'pipeline', [])
+    return value
+}
+
+const prepareEventActions = (eventActions, event) => {
+    return eventActions.reduce((inputEvent, eventAction) =>
+        Object.entries(eventAction)
+            .reduce((last, [method, action]) =>
+                last[method](action), inputEvent), [event])
+}
 
 const Limitless = (
         {
            jobDefinitions = [],
+           pipelineDefinitions = [],
+           config = [],
            eventActions = [],
            argumentHandlers = {},
            runHandlers = {},
-           triggerHandlers = {}
+           triggerHandlers = {},
         } = {}
     ) => {
         const addAction = (name) => (action) => {
@@ -32,7 +41,7 @@ const Limitless = (
                 .reduce((previousValue, argument) =>
                     argumentHandlers[argument.type](previousValue), event)
 
-            pastResults.push(runHandlers[job.runType](args, job, name, pastResults, event))
+            return runHandlers[job.runType](args, job, name, pastResults, event)
         }
 
         const addHandler = (handlers) => (name, action) => {
@@ -70,13 +79,20 @@ const Limitless = (
                 fs.readFile(filename, 'utf8', (error, contents) => {
                     if (error)
                         throw Error(`Something went wrong - ${error}`)
-                    handler(contents).forEach(core.withJobDefinition)
+                    const {jobs, config, pipeline} = handler(contents)
+                    jobs.forEach(core.withJobDefinition)
+                    core.withConfig(config)
+                    core.withPipeline(pipeline)
                 })
 
                 return core
             },
+            withConfig: (additionalConfig) =>
+                config = {...config, ...additionalConfig} && core,
             withJobDefinition: (jobDefinition) =>
                 jobDefinitions.push(jobDefinition) && core,
+            withPipeline: (pipeline) =>
+                pipelineDefinitions.push(pipeline) && core,
 
             withArgumentHandler: addHandler(argumentHandlers),
             withArgumentHandlers: (handlers) =>
@@ -90,22 +106,33 @@ const Limitless = (
             withTriggerHandlers: (handlers) =>
                 addHandlers(handlers, core.withTriggerHandler),
 
-            process: (event) => {
+            process: (event = undefined) => {
                 const allDefinitions = jobDefinitions.map((value, index) =>
                     [value.name || `job-${index}`, value])
 
-                return eventActions.reduce((inputEvent, eventAction) =>
-                    Object.entries(eventAction)
-                        .reduce((last, [method, action]) =>
-                            last[method](action), inputEvent), [event])
-                    .reduce((previousValues, event) => {
-                        allDefinitions
+                const jobLookup = allDefinitions.reduce((result, definition) => {
+                    result[definition[0]] = definition[1]
+                    return result
+                }, {})
+
+                const applyPipeline = (returnValues, event) =>
+                    ([name, jobDefinition]) =>
+                        pipelineDefinitions
+                            .filter(pipeline =>
+                                pipeline.triggers.includes(name))
+                            .reduce((result, definition) =>
+                                    definition.steps.reduce((result, jobName) =>
+                                            apply(jobLookup[jobName], jobName, result, returnValues)
+                                        , result)
+                                , apply(jobDefinition, name, event, returnValues))
+
+                return prepareEventActions(eventActions, event)
+                    .reduce((returnValues, event) =>
+                        [...returnValues, ...allDefinitions
                             .filter(([_, jobDefinition]) =>
                                 isTriggered(jobDefinition, event))
-                            .forEach(([name, jobDefinition]) =>
-                                apply(jobDefinition, name, event, previousValues))
-                        return previousValues
-                    }, [])
+                            .map(applyPipeline(returnValues, event))]
+                    , [])
             }
         }
     return core

@@ -9,7 +9,7 @@ describe('Limitless', () => {
     describe('#process', () => {
         it('empty job', () => {
             Limitless()
-                .process("").should.deep.equal([])
+                .process().should.deep.equal([])
         })
 
         it('multiple jobs', () => {
@@ -115,16 +115,44 @@ describe('Limitless', () => {
                 .process("1 , C ,  , 2 , 3 , 4")
                 .should.deep.equal([1, "ACB", 2, 3, 4])
         })
+
+        describe('#pipeline', () => {
+            it('triggered jobs run pipeline', () => {
+                Limitless()
+                    .withJobDefinition({
+                        runType: 'parseInt'
+                    })
+                    .withJobDefinition({
+                        runType: 'convertInts', triggers: [{
+                            type: "regex", definition: "\\d+"
+                        }]
+                    })
+                    .withPipeline({
+                        triggers: ["job-1"],
+                        steps: [
+                            "job-0", // default job name
+                        ]
+                    })
+                    .withRunHandler('parseInt', el => parseInt(el))
+                    .withRunHandler('convertInts', e => e.trim().slice(1))
+                    .withTriggerHandler('regex', (definition, event) =>
+                        event.match(new RegExp(definition)))
+                    .flatMap(event =>
+                        event.split(','))
+                    .process("A11, B24, C32, D42")
+                    .should.deep.equal([11, 24, 32, 42])
+            })
+        })
     })
 
     describe('#defaultFileHandler()', () => {
         it('should try to parse json - default', () => {
-            const defaultValue = [{
+            const defaultValue = {
                 config: {},
                 jobs: [],
                 pipeline: [],
-            }]
-            const value = defaultFileHandler("[{}]")
+            }
+            const value = defaultFileHandler("{}")
             defaultValue.should.deep.equal(value)
         })
     })
