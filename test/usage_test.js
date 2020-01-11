@@ -8,44 +8,37 @@ const defaultFileHandler = limitless.defaultFileHandler
 describe('Limitless', () => {
     describe('#process', () => {
         it('empty job', () => {
-            Limitless()
-                .process().should.deep.equal([])
+            Limitless().process()
+                .should.deep.equal([])
         })
 
         it('multiple jobs', () => {
-            let first = Limitless()
-                .withJobDefinition({
-                    runType: 'split'
-                })
-                .withRunHandler('split', event => event.split(','))
+            let first = Limitless().withJobDefinition({
+                runType: 'split'
+            }).withRunHandler('split', event => event.split(','))
 
-            let second = Limitless()
-                .withJobDefinition({
-                    runType: 'split'
-                })
-                .withRunHandler('split', event => event.split(',').map(e => parseInt(e)))
+            let second = Limitless().withJobDefinition({
+                runType: 'split'
+            }).withRunHandler('split', event => event.split(',').map(e => parseInt(e)))
 
             first.process("1,2,3,4").should.deep.equal([["1", "2", "3", "4"]])
             second.process("1,2,3,4").should.deep.equal([[1, 2, 3, 4]])
         })
 
         it('minimal job', () => {
-            Limitless()
-                .withJobDefinition({
-                    runType: 'split'
-                })
-                .withRunHandler('split', event => event.split(','))
+            Limitless().withJobDefinition({
+                runType: 'split'
+            }).withRunHandler('split', event => event.split(','))
                 .process("1,2,3,4")
                 .should.deep.equal([["1", "2", "3", "4"]])
         })
 
         it('job - arguments', () => {
-            Limitless()
-                .withJobDefinition({
-                    runType: 'sum', arguments: [{
-                        type: "extract"
-                    }]
-                })
+            Limitless().withJobDefinition({
+                runType: 'sum', arguments: [{
+                    type: "extract"
+                }]
+            })
                 .withRunHandler('sum', values =>
                     values.reduce((a, b) => a + b, 0))
                 .withArgumentHandler('extract', element =>
@@ -56,13 +49,11 @@ describe('Limitless', () => {
         })
 
         it('minimal job - map', () => {
-            Limitless()
-                .withJobDefinition({
-                    runType: 'parseInt'
-                })
-                .withRunHandler('parseInt', e =>
-                    e.map(el => parseInt(el)))
-                .map(event => event.split(','))
+            Limitless().withJobDefinition({
+                runType: 'parseInt'
+            }).withRunHandler('parseInt', e =>
+                e.map(el => parseInt(el))
+            ).map(event => event.split(','))
                 .process("1,2,3,4")
                 .should.deep.equal([[1, 2, 3, 4]])
         })
@@ -80,31 +71,45 @@ describe('Limitless', () => {
         })
 
         it('all jobs run without triggers', () => {
-            Limitless()
-                .withJobDefinition({
-                    runType: 'parseInt'
-                }).withJobDefinition({
-                    runType: 'addLetter'
-                })
-                .withRunHandler('parseInt', e =>
-                    e.split(',').map(el => parseInt(el)))
-                .withRunHandler('addLetter', e =>
-                    "A" + e + "B")
-                .process("1,2,3,4")
+            Limitless({
+                jobDefinitions: [
+                    {
+                        runType: 'parseInt'
+                    },
+                    {
+                        runType: 'addLetter'
+                    }
+                ], runHandlers: {
+                    parseInt: e =>
+                        e.split(',').map(el => parseInt(el)),
+                    addLetter: e => "A" + e + "B"
+                }
+            }).process("1,2,3,4")
                 .should.deep.equal([[1, 2, 3, 4], "A1,2,3,4B"])
         })
 
+        it("don't run jobs without matching triggers if any trigger handlers are registered", () => {
+            Limitless({
+                jobDefinitions: [{
+                    runType: 'parseInt'
+                }], triggerHandlers: { wontBeRun: e => e }
+            }).process("1,2,3,4")
+                .should.deep.equal([])
+        })
+
         it('triggered jobs run', () => {
-            Limitless()
-                .withJobDefinition({
+            const jobDefinitions = [
+                {
                     runType: 'parseInt', triggers: [{
                         type: "regex", definition: "\\d+"
                     }]
-                }).withJobDefinition({
+                }, {
                     runType: 'addLetter', triggers: [{
                         type: "regex", definition: "\\D+"
                     }]
-                })
+                }
+            ]
+            Limitless({ jobDefinitions })
                 .withRunHandler('parseInt', el => parseInt(el))
                 .withRunHandler('addLetter', e => "A" + e + "B")
                 .withTriggerHandler('regex', (definition, event) =>
@@ -116,30 +121,55 @@ describe('Limitless', () => {
                 .should.deep.equal([1, "ACB", 2, 3, 4])
         })
 
+        describe('__identity', () => {
+            it('returns input, included by default', () => {
+                Limitless().withJobDefinition({
+                    runType: "__identity"
+                }).process("It Works")
+                    .should.deep.equal(["It Works"])
+            })
+        })
+
+        describe('__all', () => {
+            it('defaults to true', () => {
+                Limitless().withJobDefinition({
+                    runType: '__identity', triggers: [{
+                        type: "__all", definition: []
+                    }]
+                }).process(true)
+                    .should.deep.equal([true])
+            })
+        })
+
+
         describe('#pipeline', () => {
             it('triggered jobs run pipeline', () => {
-                Limitless()
-                    .withJobDefinition({
-                        runType: 'parseInt'
-                    })
-                    .withJobDefinition({
-                        runType: 'convertInts', triggers: [{
-                            type: "regex", definition: "\\d+"
-                        }]
-                    })
-                    .withPipeline({
-                        triggers: ["job-1"],
-                        steps: [
-                            "job-0", // default job name
-                        ]
-                    })
-                    .withRunHandler('parseInt', el => parseInt(el))
-                    .withRunHandler('convertInts', e => e.trim().slice(1))
-                    .withTriggerHandler('regex', (definition, event) =>
-                        event.match(new RegExp(definition)))
-                    .flatMap(event =>
-                        event.split(','))
-                    .process("A11, B24, C32, D42")
+                const config = {
+                    jobDefinitions: [
+                        {
+                            runType: 'parseInt'
+                        },
+                        {
+                            runType: 'convertInts', triggers: [{
+                                type: "regex", definition: "\\d+"
+                            }]
+                        }
+                    ], runHandlers: {
+                        parseInt: el => parseInt(el),
+                        convertInts: e => e.trim().slice(1)
+                    }
+                }
+
+                Limitless(config).withPipeline({
+                    triggers: ["job-1"],
+                    steps: [
+                        "job-0", // default job name
+                    ]
+                }).withTriggerHandler('regex', (definition, event) =>
+                    event.match(new RegExp(definition))
+                ).flatMap(event =>
+                    event.split(',')
+                ).process("A11, B24, C32, D42")
                     .should.deep.equal([11, 24, 32, 42])
             })
         })

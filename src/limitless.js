@@ -1,28 +1,48 @@
 const fs = "fs"
 
-const addDefault = (base, property, value) =>
-    !base[property] && (base[property] = value)
-
-const defaultFileHandler = (contents) => {
-    const value = JSON.parse(contents)
-    addDefault(value, 'config', {})
-    addDefault(value, 'jobs', [])
-    addDefault(value, 'pipeline', [])
-    return value
+Object.prototype.applyBlock = function(block) {
+    block(this)
+    return this
 }
 
-const prepareEventActions = (eventActions, event) => {
-    return eventActions.reduce((inputEvent, eventAction) =>
+const defaultFileHandler = (contents) =>
+    JSON.parse(contents).applyBlock(value => {
+        if(!value.config)
+            value.config = {}
+
+        if(!value.jobs)
+            value.jobs = []
+
+        if(!value.pipeline)
+            value.pipeline = []
+    })
+
+const prepareEventActions = (eventActions, event) =>
+    eventActions.reduce((inputEvent, eventAction) =>
         Object.entries(eventAction)
             .reduce((last, [method, action]) =>
                 last[method](action), inputEvent), [event])
+
+const Builtins = {
+    runHandlers: {
+        __identity: (args) => args
+    },
+    triggerHandlers: {
+        __all: (triggers, event, triggerHandlers) =>
+            (triggers || []).reduce((previousValue, trigger) =>
+                previousValue
+                && triggerHandlers[trigger.type](trigger.definition, event, triggerHandlers), true)
+    },
 }
+
+const BUILTIN_TRIGGERS = new Set(Object.keys(Builtins.triggerHandlers))
+const BUILTIN_RUN_HANDLERS = new Set(Object.keys(Builtins.runHandlers))
 
 const Limitless = (
         {
            jobDefinitions = [],
            pipelineDefinitions = [],
-           config = [],
+           config = {},
            eventActions = [],
            argumentHandlers = {},
            runHandlers = {},
@@ -30,16 +50,14 @@ const Limitless = (
         } = {}
     ) => {
         const addAction = (name) => (action) => {
-            let newAction = {}
-            newAction[name] = action
-            eventActions.push(newAction)
+            eventActions.push({}.applyBlock(newAction => newAction[name] = action))
             return core
         }
 
         const apply = (job, name, event, pastResults) => {
             const args = (job.arguments || [])
-                .reduce((previousValue, argument) =>
-                    argumentHandlers[argument.type](previousValue), event)
+                .reduce((previousValue, { type }) =>
+                    argumentHandlers[type](previousValue), event)
 
             return runHandlers[job.runType](args, job, name, pastResults, event)
         }
@@ -49,19 +67,11 @@ const Limitless = (
             return core
         }
 
-        const addHandlers = (newHandlers, handler) => {
-            Object.entries(newHandlers)
-                .forEach(([key, value]) =>
-                    handler(key, value))
-            return core
-        }
-
         const isTriggered = (jobDefinition, event) =>
             Object.keys(triggerHandlers).length === 0
-            || jobDefinition.triggers
-            && jobDefinition.triggers
-                .map(trigger =>
-                    triggerHandlers[trigger.type](trigger.definition, event))
+            || (jobDefinition.triggers || [])
+                .map(({type, definition}) =>
+                    triggerHandlers[type](definition, event, triggerHandlers))
                 .reduce((previousValue, currentValue) =>
                     previousValue || currentValue, false)
 
@@ -79,7 +89,7 @@ const Limitless = (
                 fs.readFile(filename, 'utf8', (error, contents) => {
                     if (error)
                         throw Error(`Something went wrong - ${error}`)
-                    const {jobs, config, pipeline} = handler(contents)
+                    const { jobs, config, pipeline } = handler(contents)
                     jobs.forEach(core.withJobDefinition)
                     core.withConfig(config)
                     core.withPipeline(pipeline)
@@ -89,22 +99,24 @@ const Limitless = (
             },
             withConfig: (additionalConfig) =>
                 config = {...config, ...additionalConfig} && core,
-            withJobDefinition: (jobDefinition) =>
-                jobDefinitions.push(jobDefinition) && core,
+            withJobDefinition: ({triggers = [], runType = '', ...rest}) => {
+                jobDefinitions.push({triggers, runType, ...rest})
+
+                if(BUILTIN_RUN_HANDLERS.has(runType))
+                    core.withRunHandler(runType, Builtins.runHandlers[runType])
+
+                triggers.forEach(({type}) => {
+                    if(BUILTIN_TRIGGERS.has(type))
+                        core.withTriggerHandler(type, Builtins.triggerHandlers[type])
+                })
+                return core
+            },
             withPipeline: (pipeline) =>
                 pipelineDefinitions.push(pipeline) && core,
 
             withArgumentHandler: addHandler(argumentHandlers),
-            withArgumentHandlers: (handlers) =>
-                addHandlers(handlers, core.withArgumentHandler),
-
             withRunHandler: addHandler(runHandlers),
-            withRunHandlers: (handlers) =>
-                addHandlers(handlers, core.withRunHandler),
-
             withTriggerHandler: addHandler(triggerHandlers),
-            withTriggerHandlers: (handlers) =>
-                addHandlers(handlers, core.withTriggerHandler),
 
             process: (event = undefined) => {
                 const allDefinitions = jobDefinitions.map((value, index) =>
