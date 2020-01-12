@@ -1,11 +1,15 @@
-image: node:9.11.1
+image: node:latest
 
 before_script:
-  - yarn install
-
-build:
-  stage: build
-  cache:
-    paths:
+    - curl -o- -L https://yarnpkg.com/install.sh | bash
+    - export PATH="$HOME/.yarn/bin:$HOME/.config/yarn/global/node_modules/.bin:$PATH"
+    - yarn install
+    
+cache:
+  paths:
     - node_modules/
     - .yarn
+
+build:
+  script:
+    - yarn build
