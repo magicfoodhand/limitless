@@ -6,9 +6,9 @@
 A small configurable event handler
 
 ## Installation
-```yarn add limitless```
+```yarn add limitlessjs```
 
-```npm install --save limitless```
+```npm install --save limitlessjs```
 
 ## Components
 - Events & Event Modifiers
