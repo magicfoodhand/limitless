@@ -1,2 +1,7 @@
 .idea
 node_modules
+_build/*
+.nyc_output
+coverage
+
+.DS_Store

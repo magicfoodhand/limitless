@@ -4,13 +4,23 @@
   "description": "A flexible event handler",
   "author": "Mitch McGinnis",
   "license": "MIT",
+  "main": "_build/limitless.min.js",
   "scripts": {
-    "test": "mocha",
-    "build": "yarn test"
+    "test": "jshint src && nyc --reporter=html --reporter=text mocha",
+    "minify": "terser -o _build/limitless.min.js -m -c -- src/limitless.js",
+    "build": "yarn test && yarn minify"
   },
+  "jshintConfig": {
+    "esversion": 9,
+    "asi": true,
+    "trailingcomma": true
+  },
+  "dependencies": {},
   "devDependencies": {
+    "chai": "^4.2.0",
+    "jshint": "^2.11.0-rc1",
     "mocha": "^7.0.0",
-    "chai": "^4.2.0"
-  },
-  "dependencies": {}
+    "nyc": "^15.0.0",
+    "terser": "^4.6.2"
+  }
 }
