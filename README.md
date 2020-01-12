@@ -1,3 +1,6 @@
+[![pipeline status](https://gitlab.com/inapinch/limitless/badges/master/pipeline.svg)](https://gitlab.com/inapinch/limitless/commits/master)
+[![coverage report](https://gitlab.com/inapinch/limitless/badges/master/coverage.svg)](https://gitlab.com/inapinch/limitless/commits/master)
+
 # Limitless
 
 A small configurable event handler
