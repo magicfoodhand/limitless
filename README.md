@@ -10,6 +10,12 @@ A small configurable event handler
 
 ```npm install --save limitlessjs```
 
+## Usage
+```javascript
+    const { Limitless } = require('limitlessjs')
+    Limitless().process()
+```
+
 ## Components
 - Events & Event Modifiers
 - Job Definitions
