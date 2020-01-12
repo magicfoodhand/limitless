@@ -1,6 +1,6 @@
 {
-  "name": "limitless",
-  "version": "0.1.0",
+  "name": "limitlessjs",
+  "version": "0.1.1",
   "description": "A flexible event handler",
   "author": "Mitch McGinnis",
   "license": "MIT",
