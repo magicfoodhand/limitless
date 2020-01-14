@@ -80,7 +80,7 @@ Run a job definition, if triggered.
 - __toJson - converts input to json
 
 ### Triggers & Trigger Handlers
-Decides when a job should run. By default if no trigger handlers are registered then all jobs are run, if any triggers 
+Decides when a job should run. By default if no trigger handlers are registered then all jobs are run, if any trigger handlers 
 have been registered then only the jobs with matching triggers will run.
     
     // Trigger
