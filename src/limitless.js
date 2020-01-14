@@ -98,8 +98,10 @@ const Limitless = (
                 core.withPipeline(pipeline)
                 return core
             },
-            withConfig: (additionalConfig) =>
-                config = {...config, ...additionalConfig,} && core,
+            withConfig: (additionalConfig) => {
+                config = {...config, ...additionalConfig,}
+                return core
+            },
             withJobDefinition: ({runType, ...rest}) => {
                 jobDefinitions.push(applyConfig({ runType, ...rest,}))
                 return core
