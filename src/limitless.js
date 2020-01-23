@@ -1,5 +1,9 @@
 const fs = require("fs")
 
+const {
+    Builtin, BUILTIN_ARGUMENT_HANDLERS, BUILTIN_RUN_HANDLERS, BUILTIN_TRIGGERS
+} = require("./builtin")
+
 const getMethods = (obj) =>
     Object.getOwnPropertyNames(obj)
         .filter(name => typeof obj[name] === 'function' && name !== 'constructor')
@@ -41,36 +45,45 @@ const Limitless = (
            triggerHandlers = {},
         } = {}
     ) => {
-        const applyConfig = (newJob) => {
-            const {runType} = newJob
-            addDefault(newJob, 'arguments', [])
-            addDefault(newJob, 'triggers', [])
+        const registerArgs = (jobArguments) => {
+            jobArguments.filter(({type}) =>
+                BUILTIN_ARGUMENT_HANDLERS.has(type) && !argumentHandlers[type]
+            ).forEach(({type, definition}) => {
+                if(type === '__keyword')
+                    registerArgs(definition && Object.values(definition) || [])
+                else if(type === '__positional')
+                    registerArgs(definition || [])
+                core.withArgumentHandler(type, Builtin.argumentHandlers[type])
+            })
+        }
 
-            newJob.args = (event) =>
-                newJob.arguments
-                    .reduce((previousValue, {type, ...argumentDefinitions}) =>
-                        argumentHandlers[type](previousValue, argumentDefinitions), event)
+        const registerDefinition = (newJob) => {
+            const {runType} = newJob
+            addDefault(newJob,  'arguments', [])
+            addDefault(newJob,  'triggers', [])
 
             if(BUILTIN_RUN_HANDLERS.has(runType) && !runHandlers[runType])
-                core.withRunHandler(runType, Builtins.runHandlers[runType])
+                core.withRunHandler(runType, Builtin.runHandlers[runType])
 
-            newJob.arguments.filter(({type}) =>
-                BUILTIN_ARGUMENT_HANDLERS.has(type) && !argumentHandlers[type]
-            ).forEach(({type}) =>
-                core.withArgumentHandler(type, Builtins.argumentHandlers[type]))
+            registerArgs(newJob.arguments)
 
             newJob.triggers.filter(({type}) =>
                 BUILTIN_TRIGGERS.has(type) && !triggerHandlers[type]
             ).forEach(({type}) =>
-                core.withTriggerHandler(type, Builtins.triggerHandlers[type])
+                core.withTriggerHandler(type, Builtin.triggerHandlers[type])
             )
             return newJob
         }
 
-        jobDefinitions.forEach(applyConfig)
+        jobDefinitions.forEach(registerDefinition)
+
+        const createArgs = (newJob, event) =>
+            newJob.arguments
+                .reduce((previousValue, {type, ...argumentDefinitions}) =>
+                    argumentHandlers[type](previousValue, argumentDefinitions, argumentHandlers), event)
 
         const apply = (job, name, event, pastResults) =>
-            runHandlers[job.runType](job.args(event), job, name, pastResults, event, config)
+            runHandlers[job.runType](createArgs(job, event), job, name, pastResults, event, config)
 
         const EventModifiers = {
             ...getMethods(Array.prototype).reduce((methods, name) => {
@@ -103,7 +116,7 @@ const Limitless = (
                 return core
             },
             withJobDefinition: ({runType, ...rest}) => {
-                jobDefinitions.push(applyConfig({ runType, ...rest,}))
+                jobDefinitions.push(registerDefinition({ runType, ...rest,}))
                 return core
             },
             withPipeline: (pipeline) =>
@@ -130,17 +143,18 @@ const Limitless = (
                     return result
                 }, {})
 
-                return eventModifiers.reduce((inputEvent, eventModifier) =>
+                const preparedEvents = eventModifiers.reduce((inputEvent, eventModifier) =>
                     Object.entries(eventModifier)
                         .reduce((last, [method, params]) => {
                             const result = runMethod(last, method, params)
                             return Array.isArray(result) ? result : [result,]
                         }, inputEvent), events)
-                    .reduce((returnValues, event) =>
+
+                return preparedEvents.reduce((returnValues, event) =>
                         [...returnValues, ...allDefinitions
                             .filter(([_, jobDefinition]) =>
                                 Object.keys(triggerHandlers).length === 0 ||
-                                Builtins.triggerHandlers.__any(jobDefinition.triggers, event, triggerHandlers))
+                                Builtin.triggerHandlers.__any(jobDefinition.triggers, event, triggerHandlers))
                             .map(([name, jobDefinition]) =>
                                     pipelineDefinitions
                                         .filter(pipeline =>
@@ -155,38 +169,6 @@ const Limitless = (
 
     return core
 }
-
-const Builtins = {
-    argumentHandlers: {
-        __fromRegex: (event, { definition }) => {
-            const regexMatch = event.match(new RegExp(definition))
-            return regexMatch && regexMatch.length > 1 ? regexMatch.slice(1) : regexMatch
-        },
-        __fromJson: (event) =>
-            JSON.parse(event),
-    },
-    runHandlers: {
-        __identity: (args) => args,
-        __toJson: (args) => JSON.stringify(args),
-    },
-    triggerHandlers: {
-        __all: (triggers, event, triggerHandlers) =>
-            (triggers || []).reduce((previousValue, {type, definition}) =>
-                previousValue &&
-                triggerHandlers[type](definition, event, triggerHandlers), true),
-        __any: (triggers, event, triggerHandlers) =>
-            (triggers || []).reduce((previousValue, {type, definition}) =>
-                previousValue ||
-                triggerHandlers[type](definition, event, triggerHandlers), false),
-    },
-}
-
-const keySet = (o) =>
-    new Set(Object.keys(o))
-
-const BUILTIN_ARGUMENT_HANDLERS = keySet(Builtins.argumentHandlers),
-    BUILTIN_TRIGGERS = keySet(Builtins.triggerHandlers),
-    BUILTIN_RUN_HANDLERS = keySet(Builtins.runHandlers)
 
 module.exports.Limitless = Limitless
 module.exports.defaultFileHandler = defaultFileHandler

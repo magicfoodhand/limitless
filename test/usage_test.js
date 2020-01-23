@@ -182,8 +182,103 @@ describe('Limitless', () => {
     })
 
     describe('built in argument handlers', () => {
+        describe('__value', () => {
+            it('uses value from definition', () => {
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        { type: '__value', definition: 37 }
+                    ]
+                }).process('42')
+                    .should.deep.equal([37])
+            })
+        })
+
+        describe('__env', () => {
+            it('uses environment variable with name from definition', () => {
+                process.env['test'] = 'meaning of life'
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        { type: '__env', definition: 'test' }
+                    ]
+                }).process('42')
+                    .should.deep.equal(['meaning of life'])
+            })
+
+            it('defaults to undefined', () => {
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        { type: '__env', definition: 'unknown' }
+                    ]
+                }).process('42')
+                    .should.deep.equal([undefined])
+            })
+        })
+
+        describe('__positional', () => {
+            it('uses handlers from definition', () => {
+                process.env['myvalue'] = 'myvalue'
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        { 
+                            type: '__positional', 
+                            definition: [
+                                { type: '__fromJson' },
+                                { type: '__env', definition: 'myvalue' }
+                            ] 
+                        }
+                    ]
+                }).process('{"testing": 42}')
+                    .should.deep.equal([[{"testing": 42}, 'myvalue']])
+            })
+
+            it('args are empty array if definition is missing', () => {
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        {
+                            type: '__positional'
+                        }
+                    ]
+                }).process('{"testing": 42}')
+                    .should.deep.equal([[]])
+            })
+        })
+
+
+        describe('__keyword', () => {
+            it('uses handlers from definition', () => {
+                process.env['mykwvalue'] = 'testing'
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        {
+                            type: '__keyword',
+                            definition: {
+                                meaningOfLife: { type: '__fromJson' },
+                                fromEnv: { type: '__env', definition: 'mykwvalue' }
+                            }
+                        }
+                    ]
+                }).process('{"testing": 42}')
+                    .should.deep.equal([{
+                        meaningOfLife: {"testing": 42},
+                        fromEnv: 'testing'
+                    }])
+            })
+
+
+            it('args are empty object if definition is missing', () => {
+                Limitless().withJobDefinition({
+                    runType: '__identity', arguments: [
+                        {
+                            type: '__keyword'
+                        }
+                    ]
+                }).process('{"testing": 42}')
+                    .should.deep.equal([{}])
+            })
+        })
+
         describe('__fromJson', () => {
-            it('match groups are sent as args', () => {
+            it('converts input to JSON', () => {
                 Limitless().withJobDefinition({
                     runType: '__identity', arguments: [
                         { type: '__fromJson' }
