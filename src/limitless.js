@@ -1,9 +1,5 @@
 const fs = require("fs")
 
-const {
-    Builtin, BUILTIN_ARGUMENT_HANDLERS, BUILTIN_RUN_HANDLERS, BUILTIN_TRIGGERS
-} = require("./builtin")
-
 const getMethods = (obj) =>
     Object.getOwnPropertyNames(obj)
         .filter(name => typeof obj[name] === 'function' && name !== 'constructor')
@@ -169,6 +165,51 @@ const Limitless = (
 
     return core
 }
+
+const Builtin = {
+    argumentHandlers: {
+        __fromRegex: (event, { definition }) => {
+            const regexMatch = event.match(new RegExp(definition))
+            return regexMatch && regexMatch.length > 1 ? regexMatch.slice(1) : regexMatch
+        },
+        __fromJson: (event) =>
+            JSON.parse(event),
+        __keyword: (event, { definition = {} }, argumentHandlers) =>
+            Object.entries(definition)
+                .reduce((previousValue, [key, {type, definition}]) => {
+                    previousValue[key] = argumentHandlers[type](event, {definition,}, argumentHandlers)
+                    return previousValue
+                }, {}),
+        __positional: (event, { definition = [] }, argumentHandlers) =>
+            definition.map(({type, definition}) =>
+                argumentHandlers[type](event, { definition, }, argumentHandlers)),
+        __env: (_, { definition }) =>
+            process.env[definition],
+        __value: (_, { definition }) =>
+            definition,
+    },
+    runHandlers: {
+        __identity: (args) => args,
+        __toJson: (args) => JSON.stringify(args),
+    },
+    triggerHandlers: {
+        __all: (triggers, event, triggerHandlers) =>
+            (triggers || []).reduce((previousValue, {type, definition}) =>
+                previousValue &&
+                triggerHandlers[type](definition, event, triggerHandlers), true),
+        __any: (triggers, event, triggerHandlers) =>
+            (triggers || []).reduce((previousValue, {type, definition}) =>
+                previousValue ||
+                triggerHandlers[type](definition, event, triggerHandlers), false),
+    },
+}
+
+const keySet = (o) =>
+    new Set(Object.keys(o))
+
+const BUILTIN_ARGUMENT_HANDLERS = keySet(Builtin.argumentHandlers),
+    BUILTIN_TRIGGERS = keySet(Builtin.triggerHandlers),
+    BUILTIN_RUN_HANDLERS = keySet(Builtin.runHandlers)
 
 module.exports.Limitless = Limitless
 module.exports.defaultFileHandler = defaultFileHandler
