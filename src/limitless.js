@@ -104,7 +104,7 @@ const Limitless = (
                 const { jobs, config, pipeline } = handler(contents)
                 jobs.forEach(core.withJobDefinition)
                 core.withConfig(config)
-                core.withPipeline(pipeline)
+                pipeline.forEach(core.withPipeline)
                 return core
             },
             withConfig: (additionalConfig) => {

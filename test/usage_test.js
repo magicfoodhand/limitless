@@ -9,11 +9,13 @@ describe('Limitless', () => {
     describe('forFile', () => {
         it('reads defaults from a file', () => {
             const jobDefinitions = []
-            Limitless({jobDefinitions}).forFile('test/test.json')
+            const pipelineDefinitions = []
+            Limitless({jobDefinitions, pipelineDefinitions}).forFile('test/test.json')
             const { runType, arguments, triggers } = jobDefinitions[0]
             runType.should.equal('__identity')
             arguments.should.deep.equal([])
             triggers.should.deep.equal([])
+            pipelineDefinitions.should.deep.equal([])
         })
     })
 
