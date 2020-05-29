@@ -166,14 +166,19 @@ const Limitless = (
     return core
 }
 
+const SharedHandlers = {
+    __identity: (args) => args,
+    __fromJson: (event) => JSON.parse(event),
+    __toJson: (args) => JSON.stringify(args),
+}
+
 const Builtin = {
     argumentHandlers: {
+        ...SharedHandlers,
         __fromRegex: (event, { definition }) => {
             const regexMatch = event.match(new RegExp(definition))
             return regexMatch && regexMatch.length > 1 ? regexMatch.slice(1) : regexMatch
         },
-        __fromJson: (event) =>
-            JSON.parse(event),
         __keyword: (event, { definition = {} }, argumentHandlers) =>
             Object.entries(definition)
                 .reduce((previousValue, [key, {type, definition}]) => {
@@ -189,8 +194,7 @@ const Builtin = {
             definition,
     },
     runHandlers: {
-        __identity: (args) => args,
-        __toJson: (args) => JSON.stringify(args),
+        ...SharedHandlers,
     },
     triggerHandlers: {
         __all: (triggers, event, triggerHandlers) =>
