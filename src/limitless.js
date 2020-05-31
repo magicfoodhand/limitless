@@ -41,18 +41,6 @@ const Limitless = (
            triggerHandlers = {},
         } = {}
     ) => {
-        const registerArgs = (jobArguments) => {
-            jobArguments.filter(({type}) =>
-                BUILTIN_ARGUMENT_HANDLERS.has(type) && !argumentHandlers[type]
-            ).forEach(({type, definition}) => {
-                if(type === '__keyword')
-                    registerArgs(definition && Object.values(definition) || [])
-                else if(type === '__positional')
-                    registerArgs(definition || [])
-                core.withArgumentHandler(type, Builtin.argumentHandlers[type])
-            })
-        }
-
         const registerDefinition = (newJob) => {
             const {runType} = newJob
             addDefault(newJob,  'arguments', [])
@@ -60,8 +48,6 @@ const Limitless = (
 
             if(BUILTIN_RUN_HANDLERS.has(runType) && !runHandlers[runType])
                 core.withRunHandler(runType, Builtin.runHandlers[runType])
-
-            registerArgs(newJob.arguments)
 
             newJob.triggers.filter(({type}) =>
                 BUILTIN_TRIGGERS.has(type) && !triggerHandlers[type]
@@ -76,7 +62,7 @@ const Limitless = (
         const createArgs = (newJob, event) =>
             newJob.arguments
                 .reduce((previousValue, {type, ...argumentDefinitions}) =>
-                    argumentHandlers[type](previousValue, argumentDefinitions, argumentHandlers), event)
+                    (argumentHandlers[type] || Builtin.argumentHandlers[type])(previousValue, argumentDefinitions, argumentHandlers), event)
 
         const apply = (job, name, event, pastResults) =>
             runHandlers[job.runType](createArgs(job, event), job, name, pastResults, event, config)
@@ -115,8 +101,10 @@ const Limitless = (
                 jobDefinitions.push(registerDefinition({ runType, ...rest,}))
                 return core
             },
-            withPipeline: (pipeline) =>
-                pipelineDefinitions.push(pipeline) && core,
+            withPipeline: (pipeline) => {
+                pipelineDefinitions.push(pipeline)
+                return core
+            },
 
             withArgumentHandler:  (name, action) => {
                 argumentHandlers[name] = action
@@ -182,12 +170,12 @@ const Builtin = {
         __keyword: (event, { definition = {} }, argumentHandlers) =>
             Object.entries(definition)
                 .reduce((previousValue, [key, {type, definition}]) => {
-                    previousValue[key] = argumentHandlers[type](event, {definition,}, argumentHandlers)
+                    previousValue[key] = (argumentHandlers[type] || Builtin.argumentHandlers[type])(event, {definition,}, argumentHandlers)
                     return previousValue
                 }, {}),
         __positional: (event, { definition = [] }, argumentHandlers) =>
             definition.map(({type, definition}) =>
-                argumentHandlers[type](event, { definition, }, argumentHandlers)),
+                (argumentHandlers[type] || Builtin.argumentHandlers[type])(event, { definition, }, argumentHandlers)),
         __env: (_, { definition }) =>
             process.env[definition],
         __value: (_, { definition }) =>
@@ -214,8 +202,7 @@ const Builtin = {
 const keySet = (o) =>
     new Set(Object.keys(o))
 
-const BUILTIN_ARGUMENT_HANDLERS = keySet(Builtin.argumentHandlers),
-    BUILTIN_TRIGGERS = keySet(Builtin.triggerHandlers),
+const BUILTIN_TRIGGERS = keySet(Builtin.triggerHandlers),
     BUILTIN_RUN_HANDLERS = keySet(Builtin.runHandlers)
 
 module.exports.Limitless = Limitless
