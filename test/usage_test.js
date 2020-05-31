@@ -221,12 +221,12 @@ describe('Limitless', () => {
                 process.env['myvalue'] = 'myvalue'
                 Limitless().withJobDefinition({
                     runType: '__identity', arguments: [
-                        { 
-                            type: '__positional', 
+                        {
+                            type: '__positional',
                             definition: [
                                 { type: '__fromJson' },
                                 { type: '__env', definition: 'myvalue' }
-                            ] 
+                            ]
                         }
                     ]
                 }).process('{"testing": 42}')
@@ -316,6 +316,34 @@ describe('Limitless', () => {
     })
 
     describe('built in trigger handlers', () => {
+        describe('__not', () => {
+            it('defaults to false', () => {
+                Limitless().withJobDefinition({
+                    runType: '__identity', triggers: [{
+                        type: "__not"
+                    }]
+                }).process(true)
+                    .should.deep.equal([])
+            })
+
+            it('inverts triggers', () => {
+                Limitless()
+                    .withTriggerHandler('isTruthy', (_, event) => event)
+                    .withJobDefinition({
+                        runType: '__identity',
+                        triggers: [{
+                        type: "__not",
+                            definition: {
+                                type: 'isTruthy'
+                            }
+                        }]
+                    })
+                    .process(false)
+                    // Trigger fired, return input
+                    .should.deep.equal([false])
+            })
+        })
+
         describe('__any', () => {
             it('does not run by default', () => {
                 Limitless().withJobDefinition({
@@ -385,8 +413,8 @@ describe('Limitless', () => {
 
             it('fails unless all triggers match', () => {
                 const triggerHandlers = {
-                    isFalsy: (event) => !event,
-                    isTruthy: (event) => event,
+                    isFalsy: (_, event) => !event,
+                    isTruthy: (_, event) => event,
                 }
                 Limitless({triggerHandlers}).withJobDefinition({
                     runType: '__identity', triggers: [{

@@ -205,6 +205,9 @@ const Builtin = {
             (triggers || []).reduce((previousValue, {type, definition}) =>
                 previousValue ||
                 triggerHandlers[type](definition, event, triggerHandlers), false),
+        __not: (definition, event, triggerHandlers) =>
+            definition &&
+            !triggerHandlers[definition.type](definition.definition, event, triggerHandlers),
     },
 }
 

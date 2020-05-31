@@ -1,6 +1,6 @@
 {
   "name": "limitlessjs",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "A flexible event handler",
   "homepage": "https://gitlab.com/inapinch/limitless",
   "repository": {
@@ -11,7 +11,7 @@
     "url": "https://gitlab.com/inapinch/limitless/issues"
   },
   "files": [
-    "_build/limitless.js",
+    "src/limitless.js",
     "_build/limitless.min.js"
   ],
   "author": "Mitch McGinnis",
