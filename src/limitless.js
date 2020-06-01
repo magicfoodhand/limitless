@@ -1,155 +1,145 @@
 const fs = require("fs")
 
 const getMethods = (obj) =>
-    Object.getOwnPropertyNames(obj)
-        .filter(name => typeof obj[name] === 'function' && name !== 'constructor')
+    Object.getOwnPropertyNames(obj).filter(name =>
+        typeof obj[name] === 'function' && name !== 'constructor')
 
 const addDefault = (object, key, value) => {
-    if(!object[key])
+    if (!object[key])
         object[key] = value
 }
 
 const defaultFileHandler = (contents) => {
-    const value = JSON.parse(contents)
-    addDefault(value, 'config', {})
-    addDefault(value, 'jobs', [])
-    addDefault(value, 'pipeline', [])
-    return value
+    const {config = {}, jobs = [], pipeline = [], ...rest} = JSON.parse(contents)
+    return {config, jobs, pipeline, ...rest,}
 }
 
 const MUTATING_METHODS = new Set(['pop', 'push', 'shift', 'unshift', 'splice',])
 
 const runMethod = (collection, method, params) => {
-    if(MUTATING_METHODS.has(method)) {
+    if (MUTATING_METHODS.has(method)) {
         collection[method](...params)
         return collection
     } else {
-        return Array.isArray(params) ?
+        const result = Array.isArray(params) ?
             collection[method](...params) :
             collection[method](params)
+        return Array.isArray(result) ? result : [result,]
     }
 }
 
+const orDefault = (handlers, builtins, type) =>
+    handlers[type] || builtins[type]
+
 const Limitless = (
-        {
-           jobDefinitions = [],
-           pipelineDefinitions = [],
-           config = {},
-           eventModifiers = [],
-           argumentHandlers = {},
-           runHandlers = {},
-           triggerHandlers = {},
-        } = {}
-    ) => {
-        const registerDefinition = (newJob) => {
-            const {runType} = newJob
-            addDefault(newJob,  'arguments', [])
-            addDefault(newJob,  'triggers', [])
+    {
+        jobDefinitions = [],
+        pipelineDefinitions = [],
+        config = {},
+        eventModifiers = [],
+        argumentHandlers = {},
+        runHandlers = {},
+        triggerHandlers = {},
+    } = {}
+) => {
+    const registerDefinition = (newJob) => {
+        addDefault(newJob, 'arguments', [])
+        addDefault(newJob, 'triggers', [])
 
-            if(BUILTIN_RUN_HANDLERS.has(runType) && !runHandlers[runType])
-                core.withRunHandler(runType, Builtin.runHandlers[runType])
+        newJob.triggers.filter(({type}) =>
+            BUILTIN_TRIGGERS.has(type) && !triggerHandlers[type]
+        ).forEach(({type}) =>
+            core.withTriggerHandler(type, Builtin.triggerHandlers[type])
+        )
+        return newJob
+    }
 
-            newJob.triggers.filter(({type}) =>
-                BUILTIN_TRIGGERS.has(type) && !triggerHandlers[type]
-            ).forEach(({type}) =>
-                core.withTriggerHandler(type, Builtin.triggerHandlers[type])
-            )
-            return newJob
-        }
+    jobDefinitions.forEach(registerDefinition)
 
-        jobDefinitions.forEach(registerDefinition)
+    const apply = (job, name, event, pastResults) => {
+        const args = job.arguments.reduce((previousValue, {type, ...argumentDefinitions}) => {
+            const handler = orDefault(argumentHandlers, Builtin.argumentHandlers, type)
+            return handler(previousValue, argumentDefinitions, argumentHandlers)
+        }, event)
 
-        const createArgs = (newJob, event) =>
-            newJob.arguments
-                .reduce((previousValue, {type, ...argumentDefinitions}) =>
-                    (argumentHandlers[type] || Builtin.argumentHandlers[type])(previousValue, argumentDefinitions, argumentHandlers), event)
+        const runHandler = orDefault(runHandlers, Builtin.runHandlers, job.runType)
+        return runHandler(args, job, name, pastResults, event, config)
+    }
 
-        const apply = (job, name, event, pastResults) =>
-            runHandlers[job.runType](createArgs(job, event), job, name, pastResults, event, config)
+    const self = (action) => (...args) => {
+        action(...args)
+        return core
+    }
 
-        const EventModifiers = {
-            ...getMethods(Array.prototype).reduce((methods, name) => {
-                methods[name] = (...params) => {
-                    const newModifier = {}
-                    newModifier[name] = params
-                    eventModifiers.push(newModifier)
-                    return core
+    const EventModifiers = {
+        ...getMethods(Array.prototype).reduce((methods, name) => {
+            methods[name] = self((...params) => {
+                const newModifier = {}
+                newModifier[name] = params
+                eventModifiers.push(newModifier)
+            })
+            return methods
+        }, {}),
+        flatten: self((depth = Infinity) =>
+            eventModifiers.push({flat: depth,})),
+    }
+
+    const core = {
+        ...EventModifiers,
+
+        forFile: self((filename, handler = defaultFileHandler) => {
+            const contents = fs.readFileSync(filename, 'utf8')
+            const {jobs, config, pipeline} = handler(contents)
+            jobs.forEach(core.withJobDefinition)
+            core.withConfig(config)
+            pipeline.forEach(core.withPipeline)
+        }),
+        withConfig: self((additionalConfig) =>
+            config = {...config, ...additionalConfig,}),
+        withJobDefinition: self((newJob) =>
+            jobDefinitions.push(registerDefinition(newJob))),
+        withPipeline: self((pipeline) =>
+            pipelineDefinitions.push(pipeline)),
+        withArgumentHandler: self((name, action) =>
+            argumentHandlers[name] = action),
+        withRunHandler: self((name, action) =>
+            runHandlers[name] = action),
+        withTriggerHandler: self((name, action) =>
+            triggerHandlers[name] = action),
+        process: (...events) => {
+            const allDefinitions = jobDefinitions.map((jobDefinition, index) => {
+                return {
+                    name: jobDefinition.name || `job-${index}`,
+                    jobDefinition,
                 }
-                return methods
-            }, {}),
-            flatten: (depth = Infinity) =>
-                eventModifiers.push({flat: depth,}) &&
-                core,
-        }
+            })
 
-        const core = {
-            ...EventModifiers,
+            const jobLookup = allDefinitions.reduce((result, {name, jobDefinition}) => {
+                result[name] = jobDefinition
+                return result
+            }, {})
 
-            forFile: (filename, handler = defaultFileHandler) => {
-                const contents = fs.readFileSync(filename, 'utf8')
-                const { jobs, config, pipeline } = handler(contents)
-                jobs.forEach(core.withJobDefinition)
-                core.withConfig(config)
-                pipeline.forEach(core.withPipeline)
-                return core
-            },
-            withConfig: (additionalConfig) => {
-                config = {...config, ...additionalConfig,}
-                return core
-            },
-            withJobDefinition: ({runType, ...rest}) => {
-                jobDefinitions.push(registerDefinition({ runType, ...rest,}))
-                return core
-            },
-            withPipeline: (pipeline) => {
-                pipelineDefinitions.push(pipeline)
-                return core
-            },
+            const preparedEvents = eventModifiers.reduce((inputEvent, eventModifier) =>
+                    Object.entries(eventModifier).reduce((last, [method, params]) =>
+                        runMethod(last, method, params), inputEvent),
+                events)
 
-            withArgumentHandler:  (name, action) => {
-                argumentHandlers[name] = action
-                return core
-            },
-            withRunHandler: (name, action) => {
-                runHandlers[name] = action
-                return core
-            },
-            withTriggerHandler:  (name, action) => {
-                triggerHandlers[name] = action
-                return core
-            },
-            process: (...events) => {
-                const allDefinitions = jobDefinitions.map((value, index) =>
-                    [value.name || `job-${index}`, value,])
-
-                const jobLookup = allDefinitions.reduce((result, definition) => {
-                    result[definition[0]] = definition[1]
-                    return result
-                }, {})
-
-                const preparedEvents = eventModifiers.reduce((inputEvent, eventModifier) =>
-                    Object.entries(eventModifier)
-                        .reduce((last, [method, params]) => {
-                            const result = runMethod(last, method, params)
-                            return Array.isArray(result) ? result : [result,]
-                        }, inputEvent), events)
-
-                return preparedEvents.reduce((returnValues, event) =>
-                        [...returnValues, ...allDefinitions
-                            .filter(([_, jobDefinition]) =>
-                                Object.keys(triggerHandlers).length === 0 ||
-                                Builtin.triggerHandlers.__any(jobDefinition.triggers, event, triggerHandlers))
-                            .map(([name, jobDefinition]) =>
-                                    pipelineDefinitions
-                                        .filter(pipeline =>
-                                            pipeline.triggers.includes(name))
-                                        .reduce((result, definition) =>
-                                                definition.steps.reduce((result, jobName) =>
-                                                        apply(jobLookup[jobName], jobName, result, returnValues),
-                                                    result),
-                                            apply(jobDefinition, name, event, returnValues))),], [])
-            },
-        }
+            return preparedEvents.reduce((returnValues, event) =>
+                [...returnValues, ...allDefinitions
+                    .filter(({_, jobDefinition}) =>
+                        Object.keys(triggerHandlers).length === 0 ||
+                        Builtin.triggerHandlers.__any(jobDefinition.triggers, event, triggerHandlers))
+                    .map(({name, jobDefinition}) =>
+                        pipelineDefinitions
+                            .filter(pipeline =>
+                                pipeline.triggers.includes(name))
+                            .reduce((result, definition) =>
+                                    definition.steps.reduce((result, jobName) =>
+                                            apply(jobLookup[jobName], jobName, result, returnValues),
+                                        result),
+                                apply(jobDefinition, name, event, returnValues))),], [])
+        },
+    }
 
     return core
 }
@@ -163,22 +153,24 @@ const SharedHandlers = {
 const Builtin = {
     argumentHandlers: {
         ...SharedHandlers,
-        __fromRegex: (event, { definition }) => {
+        __fromRegex: (event, {definition}) => {
             const regexMatch = event.match(new RegExp(definition))
             return regexMatch && regexMatch.length > 1 ? regexMatch.slice(1) : regexMatch
         },
-        __keyword: (event, { definition = {} }, argumentHandlers) =>
-            Object.entries(definition)
-                .reduce((previousValue, [key, {type, definition}]) => {
-                    previousValue[key] = (argumentHandlers[type] || Builtin.argumentHandlers[type])(event, {definition,}, argumentHandlers)
-                    return previousValue
-                }, {}),
-        __positional: (event, { definition = [] }, argumentHandlers) =>
-            definition.map(({type, definition}) =>
-                (argumentHandlers[type] || Builtin.argumentHandlers[type])(event, { definition, }, argumentHandlers)),
-        __env: (_, { definition }) =>
+        __keyword: (event, {definition = {}}, argumentHandlers) =>
+            Object.entries(definition).reduce((previousValue, [key, {type, definition}]) => {
+                const handler = orDefault(argumentHandlers, Builtin.argumentHandlers, type)
+                previousValue[key] = handler(event, {definition,}, argumentHandlers)
+                return previousValue
+            }, {}),
+        __positional: (event, {definition = []}, argumentHandlers) =>
+            definition.map(({type, definition}) => {
+                const handler = orDefault(argumentHandlers, Builtin.argumentHandlers, type)
+                return handler(event, {definition,}, argumentHandlers)
+            }),
+        __env: (_, {definition}) =>
             process.env[definition],
-        __value: (_, { definition }) =>
+        __value: (_, {definition}) =>
             definition,
     },
     runHandlers: {
@@ -199,12 +191,7 @@ const Builtin = {
     },
 }
 
-const keySet = (o) =>
-    new Set(Object.keys(o))
-
-const BUILTIN_TRIGGERS = keySet(Builtin.triggerHandlers),
-    BUILTIN_RUN_HANDLERS = keySet(Builtin.runHandlers)
+const BUILTIN_TRIGGERS = new Set(Object.keys(Builtin.triggerHandlers))
 
 module.exports.Limitless = Limitless
 module.exports.defaultFileHandler = defaultFileHandler
-

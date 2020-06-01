@@ -75,9 +75,10 @@ Run a job definition, if triggered.
 - pastResults - anything that has already been processed
 - event - the event that was passed into Argument Handlers
 
-#### Built In Run Handlers
+#### Built In Run Handlers 
 - __identity - returns input
-- __toJson - converts input to json
+- __toJson - converts input to json string
+- __fromJson - converts string to json object
 
 ### Triggers & Trigger Handlers
 Decides when a job should run. By default if no trigger handlers are registered then all jobs are run, if any trigger handlers 
@@ -95,6 +96,7 @@ have been registered then only the jobs with matching triggers will run.
 #### Built In Trigger Handlers
 - __all - Requires all triggers to match
 - __any - Requires any triggers to match, default behavior
+- __not - Inverts the result of trigger
 
 ### Arguments
 The object passed into a RunHandler, the result applying Argument Handlers on the event 
@@ -102,6 +104,16 @@ The object passed into a RunHandler, the result applying Argument Handlers on th
 #### Argument Handler
     // Argument Handler
     (event: any, argumentDefinitions: Object) => any
+
+#### Built In Argument Handlers 
+- __identity - returns input
+- __toJson - converts input to json string
+- __fromJson - converts string to json object
+- __fromRegex - definition is a regular expression
+- __keyword - definition is an object of keys to argument handlers
+- __positional - definition is an array of argument handlers
+- __env - definition is the name of the environment variable to read
+- __value - use the value from definition
 
 ### Config
 Shared object passed into Run Handlers
