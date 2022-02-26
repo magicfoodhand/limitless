@@ -1,5 +1,9 @@
 const fs = require("fs")
 
+const deprecated = (deprecationMessage, are = false) => {
+    console.warn(`${deprecationMessage} ${are ? 'are' : 'is'} deprecated, and will be removed in the next major release of limitless. See README for more information.`)
+}
+
 const getMethods = (obj) =>
     Object.getOwnPropertyNames(obj).filter(name =>
         typeof obj[name] === 'function' && name !== 'constructor')
@@ -10,6 +14,7 @@ const addDefault = (object, key, value) => {
 }
 
 const defaultFileHandler = (contents) => {
+    deprecated('`defaultFileHandler`')
     const {config = {}, jobs = [], pipeline = [], ...rest} = JSON.parse(contents)
     return {config, jobs, pipeline, ...rest,}
 }
@@ -17,6 +22,7 @@ const defaultFileHandler = (contents) => {
 const MUTATING_METHODS = new Set(['pop', 'push', 'shift', 'unshift', 'splice',])
 
 const runMethod = (collection, method, params) => {
+    deprecated(`EventModifiers (${method})`, true)
     if (MUTATING_METHODS.has(method)) {
         collection[method](...params)
         return collection
@@ -88,6 +94,7 @@ const Limitless = (
         ...EventModifiers,
 
         forFile: self((filename, handler = defaultFileHandler) => {
+            deprecated('`forFile`')
             const contents = fs.readFileSync(filename, 'utf8')
             const {jobs, config, pipeline} = handler(contents)
             jobs.forEach(core.withJobDefinition)
