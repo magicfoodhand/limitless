@@ -4,6 +4,10 @@ const deprecated = (deprecationMessage, are = false) => {
     console.warn(`${deprecationMessage} ${are ? 'are' : 'is'} deprecated, and will be removed in the next major release of limitless. See README for more information.`)
 }
 
+const apiChange = (type) => {
+    console.warn(`${type} switches from positional arguments to object arguments in the next major release of limitless. See README for more information.`)
+}
+
 const getMethods = (obj) =>
     Object.getOwnPropertyNames(obj).filter(name =>
         typeof obj[name] === 'function' && name !== 'constructor')
@@ -107,12 +111,18 @@ const Limitless = (
             jobDefinitions.push(registerDefinition(newJob))),
         withPipeline: self((pipeline) =>
             pipelineDefinitions.push(pipeline)),
-        withArgumentHandler: self((name, action) =>
-            argumentHandlers[name] = action),
-        withRunHandler: self((name, action) =>
-            runHandlers[name] = action),
-        withTriggerHandler: self((name, action) =>
-            triggerHandlers[name] = action),
+        withArgumentHandler: self((name, action) => {
+            apiChange('`ArgumentHandler`')
+            argumentHandlers[name] = action
+        }),
+        withRunHandler: self((name, action) => {
+            apiChange('`RunHandler`')
+            runHandlers[name] = action
+        }),
+        withTriggerHandler: self((name, action) => {
+            apiChange('`TriggerHandler`')
+            triggerHandlers[name] = action
+        }),
         process: (...events) => {
             const allDefinitions = jobDefinitions.map((jobDefinition, index) => {
                 return {
