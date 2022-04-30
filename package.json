@@ -1,14 +1,14 @@
 {
   "name": "limitlessjs",
-  "version": "2.0.2",
+  "version": "2.0.3",
   "description": "A flexible event handler",
-  "homepage": "https://gitlab.com/inapinch/limitless",
+  "homepage": "https://github.com/magicfoodhand/limitless",
   "repository": {
     "type": "git",
-    "url": "https://gitlab.com/inapinch/limitless.git"
+    "url": "https://github.com/magicfoodhand/limitless.git"
   },
   "bugs": {
-    "url": "https://gitlab.com/inapinch/limitless/issues"
+    "url": "https://github.com/magicfoodhand/limitless/issues"
   },
   "files": [
     "src/limitless.ts",
@@ -16,7 +16,7 @@
     "_build/src/limitless.js",
     "_build/src/limitless.js.map"
   ],
-  "author": "Mitch McGinnis",
+  "author": "magicfoodhand",
   "license": "MIT",
   "main": "_build/src/limitless.js",
   "types": "_build/src/limitless.d.ts",
