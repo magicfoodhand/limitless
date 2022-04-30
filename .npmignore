@@ -1,5 +1,5 @@
-!dist
+dist
 CHANGELOG.md
 .github
-src/limitless.ts
+src
 publish.sh
