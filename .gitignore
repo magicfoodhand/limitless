@@ -1,6 +1,6 @@
 .idea
 node_modules
-_build/*
+build/*
 .nyc_output
 coverage
 
