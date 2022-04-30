@@ -1,5 +1,5 @@
 [![Node.js Package](https://github.com/magicfoodhand/limitless/actions/workflows/npm-publish.yml/badge.svg)](https://github.com/magicfoodhand/limitless/actions/workflows/npm-publish.yml)
-[![coverage report](https://gitlab.com/inapinch/limitless/badges/master/coverage.svg)](https://gitlab.com/inapinch/limitless/commits/master)
+[![Node.js Test](https://github.com/magicfoodhand/limitless/actions/workflows/npm-test.yml/badge.svg)](https://github.com/magicfoodhand/limitless/actions/workflows/npm-test.yml)
 
 # Limitless
 
