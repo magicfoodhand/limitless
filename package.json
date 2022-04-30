@@ -11,14 +11,14 @@
     "url": "https://github.com/magicfoodhand/limitless/issues"
   },
   "files": [
-    "build/src/limitless.d.ts",
-    "build/src/limitless.js",
-    "build/src/limitless.js.map"
+    "./build/src/limitless.d.ts",
+    "./build/src/limitless.js",
+    "./build/src/limitless.js.map"
   ],
   "author": "magicfoodhand",
   "license": "MIT",
-  "main": "build/src/limitless.js",
-  "types": "build/src/limitless.d.ts",
+  "main": "./build/src/limitless.js",
+  "types": "./build/src/limitless.d.ts",
   "scripts": {
     "test": "jest",
     "build": "tsc",
