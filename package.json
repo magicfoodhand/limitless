@@ -1,6 +1,6 @@
 {
   "name": "limitlessjs",
-  "version": "2.0.9",
+  "version": "2.0.10",
   "description": "A flexible event handler",
   "homepage": "https://github.com/magicfoodhand/limitless",
   "repository": {
@@ -11,14 +11,14 @@
     "url": "https://github.com/magicfoodhand/limitless/issues"
   },
   "files": [
-    "dist/src/limitless.d.ts",
-    "dist/src/limitless.js",
-    "dist/src/limitless.js.map"
+    "output/src/limitless.d.ts",
+    "output/src/limitless.js",
+    "output/src/limitless.js.map"
   ],
   "author": "magicfoodhand",
   "license": "MIT",
-  "main": "dist/src/limitless.js",
-  "types": "dist/src/limitless.d.ts",
+  "main": "output/src/limitless.js",
+  "types": "output/src/limitless.d.ts",
   "scripts": {
     "test": "jest",
     "build": "tsc",
