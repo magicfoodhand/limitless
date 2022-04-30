@@ -1,6 +1,6 @@
 {
   "name": "limitlessjs",
-  "version": "2.0.3",
+  "version": "2.0.5",
   "description": "A flexible event handler",
   "homepage": "https://github.com/magicfoodhand/limitless",
   "repository": {
@@ -11,7 +11,6 @@
     "url": "https://github.com/magicfoodhand/limitless/issues"
   },
   "files": [
-    "src/limitless.ts",
     "_build/src/limitless.d.ts",
     "_build/src/limitless.js",
     "_build/src/limitless.js.map"
