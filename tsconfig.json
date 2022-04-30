@@ -7,7 +7,7 @@
     "noEmitOnError": true,
     "strict": true,
     "esModuleInterop": false,
-    "outDir": "build/",
+    "outDir": "dist/",
     "rootDir": "./"
   },
   "include": [
